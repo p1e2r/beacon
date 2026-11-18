@@ -1,0 +1,14 @@
+{
+  "name": "beacon-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Local end-to-end test: a tiny offline 26.1 server + a headless browser that joins it through the proxy.",
+  "dependencies": {
+    "minecraft-protocol": "1.68.0",
+    "prismarine-block": "^1.21.0",
+    "prismarine-chunk": "^1.39.0",
+    "prismarine-registry": "^1.11.0",
+    "playwright": "^1.63.0",
+    "vec3": "^0.1.10"
+  }
+}

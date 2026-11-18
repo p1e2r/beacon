@@ -1,0 +1,15 @@
+# Paste the "beacon" service into your existing compose.yaml (next to cloudflared).
+services:
+  beacon:
+    image: ghcr.io/p1e2r/beacon:latest
+    # build: .            # or build it yourself from this folder
+    container_name: beacon
+    restart: unless-stopped
+    volumes:
+      - ./beacon-data:/data          # config.json + keys.json
+    ports:
+      # Admin panel: LAN only. Don't add this port to the Cloudflare tunnel.
+      - "8081:8081"
+      # Uncomment to test the client on your LAN without the tunnel:
+      # - "8080:8080"
+    # The Cloudflare tunnel points your public hostname at http://beacon:8080

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beacon · Minecraft in your browser</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2312161c'/%3E%3Crect x='5' y='5' width='6' height='6' fill='%234fd1c5'/%3E%3Crect x='7' y='1' width='2' height='4' fill='%23a7f3eb'/%3E%3C/svg%3E" />
+  <script type="module" src="/src/main.ts"></script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="hud"></div>
+
+  <section class="menu hidden" id="main">
+    <div class="panel wide">
+      <header class="brand">
+        <div class="logo"><span></span></div>
+        <div>
+          <h1>Beacon</h1>
+          <p class="dim">Minecraft Java 26.x servers in your browser · via <b id="proxyname">your proxy</b></p>
+        </div>
+        <div class="grow"></div>
+        <button class="btn ghost" id="opensettings">Settings</button>
+      </header>
+      <div id="servers" class="servers"></div>
+      <div class="row">
+        <button class="btn primary" id="addserver">Add server</button>
+        <button class="btn" id="direct">Direct connect</button>
+        <div class="grow"></div>
+        <button class="btn ghost" id="refresh">Refresh</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="menu hidden" id="settings">
+    <div class="panel">
+      <h2>Settings</h2>
+      <form id="settingsform" autocomplete="off">
+        <label>Username <small>offline-mode name, 3–16 letters/numbers/_</small>
+          <input name="username" maxlength="16" placeholder="Steve" />
+        </label>
+        <fieldset>
+          <legend>Proxy</legend>
+          <label>Proxy address <small>leave empty to use this site</small>
+            <input name="proxy" placeholder="https://mc.example.com" />
+          </label>
+          <label>Key <small>from the proxy owner</small>
+            <input name="key" type="password" placeholder="bk_…" />
+          </label>
+          <div class="row"><button type="button" class="btn" id="testkey">Test key</button><span id="keystatus" class="keystatus"></span></div>
+        </fieldset>
+        <fieldset>
+          <legend>Textures</legend>
+          <p class="dim small">Beacon can’t ship Minecraft’s textures. Load your own <b>26.x client .jar</b> (macOS: <code>~/Library/Application Support/minecraft/versions/26.2/26.2.jar</code>, Windows: <code>%appdata%\.minecraft\versions\26.2\26.2.jar</code>) or any resource pack .zip. It stays in this browser. You can also drop the file onto the page.</p>
+          <div class="row"><label class="btn filebtn">Choose file…<input type="file" id="packfile" accept=".jar,.zip" hidden /></label><span id="packname" class="dim"></span><div class="grow"></div><button type="button" class="btn ghost" id="clearpack">Use plain colours</button></div>
+        </fieldset>
+        <fieldset>
+          <legend>Video &amp; controls</legend>
+          <label>Render distance <output for="viewDistance"></output><input type="range" name="viewDistance" min="2" max="16" step="1" /></label>
+          <label>Field of view <output for="fov"></output><input type="range" name="fov" min="50" max="110" step="1" /></label>
+          <label>Mouse sensitivity <output for="sensitivity"></output><input type="range" name="sensitivity" min="0.2" max="3" step="0.05" /></label>
+        </fieldset>
+      </form>
+      <div class="row"><div class="grow"></div><button class="btn primary" id="settingsback">Done</button></div>
+    </div>
+  </section>
+
+  <section class="menu hidden" id="connecting">
+    <div class="panel center">
+      <div class="spinner"></div>
+      <h2>Connecting…</h2>
+      <p class="dim"></p>
+    </div>
+  </section>
+
+  <section class="menu hidden" id="disconnected">
+    <div class="panel center">
+      <h2>Disconnected</h2>
+      <p class="reason"></p>
+      <button class="btn primary" id="discback">Back to server list</button>
+    </div>
+  </section>
+
+  <dialog id="serverdlg">
+    <form method="dialog">
+      <h2>Add server</h2>
+      <label>Name<input name="name" placeholder="My server" /></label>
+      <label>Address<input name="address" placeholder="play.example.com or 1.2.3.4:25565" required /></label>
+      <div class="row"><div class="grow"></div><button type="button" class="btn ghost cancel">Cancel</button><button class="btn primary">Save</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast"></div>
+</body>
+</html>

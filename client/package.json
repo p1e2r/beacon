@@ -1,0 +1,35 @@
+{
+  "name": "beacon-client",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "data": "node scripts/build-data.mjs",
+    "predev": "node scripts/build-data.mjs",
+    "dev": "vite",
+    "build": "node scripts/build-data.mjs && tsc --noEmit && vite build",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "buffer": "^6.0.3",
+    "events": "^3.3.0",
+    "fflate": "^0.8.3",
+    "minecraft-protocol": "^1.68.0",
+    "prismarine-nbt": "^2.8.0",
+    "process": "^0.11.10",
+    "protodef": "^1.19.0",
+    "three": "^0.187.0",
+    "util": "^0.12.5"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "minecraft-data": "^3.119.0",
+    "prismarine-chunk": "^1.41.0",
+    "prismarine-registry": "^1.12.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-node-polyfills": "^0.28.0"
+  }
+}

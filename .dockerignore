@@ -1,0 +1,8 @@
+**/node_modules
+client/dist
+client/public/data
+proxy/target
+tools
+data
+*.jar
+.git
