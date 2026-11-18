@@ -18,10 +18,10 @@ COPY --from=proxy /src/proxy/target/release/beacon-proxy /usr/local/bin/beacon-p
 COPY --from=web /src/client/dist /app/web
 ENV BEACON_DATA=/data \
     BEACON_WEB=/app/web \
-    BEACON_LISTEN=0.0.0.0:8080 \
-    BEACON_ADMIN_LISTEN=0.0.0.0:8081
+    BEACON_LISTEN=0.0.0.0:7320 \
+    BEACON_ADMIN_LISTEN=0.0.0.0:9108
 VOLUME /data
-EXPOSE 8080 8081
+EXPOSE 7320 9108
 USER beacon
-HEALTHCHECK --interval=30s --timeout=3s CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+HEALTHCHECK --interval=30s --timeout=3s CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/7320"]
 ENTRYPOINT ["beacon-proxy"]

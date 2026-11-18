@@ -34,12 +34,19 @@ sounds, entity models/skins, signs and other block-entity text, crafting UI.
 
 ## Hosting the proxy (Docker)
 
-1. Add the service from [`docker-compose.yml`](docker-compose.yml) to your compose file and start it.
+1. Start it with [`docker-compose.yml`](docker-compose.yml) (`docker compose up -d`). It's
+   standalone and publishes two ports on the host: **7320** (players) and **9108** (admin).
 2. In your Cloudflare tunnel, point a public hostname (e.g. `mc.example.com`) at
-   `http://beacon:8080`. **Don't** route port 8081.
-3. Open the admin panel from your home network: `http://<server-lan-ip>:8081`.
+   `http://<server-lan-ip>:7320`. Use `http://localhost:7320` if cloudflared runs on the same
+   machine, or `http://beacon:7320` if it's in the same compose network. cloudflared can run
+   anywhere that can reach that port. **Don't** route port 9108.
+3. Open the admin panel from your home network: `http://<server-lan-ip>:9108`.
 4. In **Settings**, set *Public address* to `https://mc.example.com` (used for invite links).
 5. Under **Keys**, create a key per friend and send them the key or the invite link.
+
+Without Cloudflare: any reverse proxy that terminates TLS and sets `X-Forwarded-Proto: https`
+(Caddy, nginx, Traefik) works the same way. Friends on your LAN can use
+`http://<server-lan-ip>:7320` directly.
 
 Players just open `https://mc.example.com`, pick a username, paste the key and add servers.
 
@@ -89,7 +96,7 @@ docker exec beacon beacon-proxy key disable <id>
 | `trust_proxy_headers` | `true` | real player IP from CF-Connecting-IP when the peer is local |
 | `admin_token` | | optional extra admin password |
 
-Environment: `BEACON_LISTEN` (`0.0.0.0:8080`), `BEACON_ADMIN_LISTEN` (`0.0.0.0:8081`),
+Environment: `BEACON_LISTEN` (`0.0.0.0:7320`), `BEACON_ADMIN_LISTEN` (`0.0.0.0:9108`),
 `BEACON_DATA` (`/data`), `BEACON_WEB` (`/app/web`).
 
 ### Textures for everyone
@@ -108,7 +115,7 @@ Esc menu.
 
 ```sh
 cd client && npm ci && npm run dev        # http://localhost:5173 (needs a running proxy)
-cd proxy && cargo run                     # proxy on :8080, admin on :8081
+cd proxy && cargo run                     # proxy on :7320, admin on :9108
 cd client && npm test && npm run build    # unit tests (codec, chunk format, physics) + build
 ```
 

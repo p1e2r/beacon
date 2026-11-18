@@ -39,8 +39,8 @@ USAGE:
   beacon-proxy key disable|enable|delete <id>
 
 ENV:
-  BEACON_LISTEN        public address        (default 0.0.0.0:8080)
-  BEACON_ADMIN_LISTEN  admin panel address   (default 0.0.0.0:8081, LAN-only)
+  BEACON_LISTEN        public address        (default 0.0.0.0:7320)
+  BEACON_ADMIN_LISTEN  admin panel address   (default 0.0.0.0:9108, LAN-only)
   BEACON_DATA          config + keys folder  (default ./data)
   BEACON_WEB           web client folder     (default ./web)",
         v = env!("CARGO_PKG_VERSION")
@@ -115,8 +115,8 @@ async fn main() -> anyhow::Result<()> {
     let usable = ks.usable_count();
     let st: Shared = Arc::new(AppState::new(data.clone(), web.clone(), cfg.clone(), ks));
 
-    let listen: SocketAddr = env_or("BEACON_LISTEN", "0.0.0.0:8080").parse()?;
-    let admin_listen: SocketAddr = env_or("BEACON_ADMIN_LISTEN", "0.0.0.0:8081").parse()?;
+    let listen: SocketAddr = env_or("BEACON_LISTEN", "0.0.0.0:7320").parse()?;
+    let admin_listen: SocketAddr = env_or("BEACON_ADMIN_LISTEN", "0.0.0.0:9108").parse()?;
 
     let info = {
         let st = st.clone();
