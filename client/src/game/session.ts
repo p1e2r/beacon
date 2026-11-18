@@ -50,6 +50,7 @@ export class Session {
   private keys = new Set<string>()
   private mouse = { left: false, right: false }
   private lastSent = { x: NaN, y: NaN, z: NaN, yaw: NaN, pitch: NaN, ground: false, ticks: 0 }
+  private good = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }
   private lastInputs = ''
   private lastSprint = false
   private lastFlying = false
@@ -154,6 +155,10 @@ export class Session {
         pl.vx = f.dx ? pl.vx + p.dx : p.dx
         pl.vy = f.dy ? pl.vy + p.dy : p.dy
         pl.vz = f.dz ? pl.vz + p.dz : p.dz
+        for (const k of ['vx', 'vy', 'vz'] as const) if (!Number.isFinite(pl[k])) pl[k] = 0
+        if (!Number.isFinite(pl.yaw)) pl.yaw = 0
+        if (!Number.isFinite(pl.pitch)) pl.pitch = 0
+        this.good = { x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, pitch: pl.pitch }
         this.conn.send('teleport_confirm', { teleportId: p.teleportId })
         this.conn.send('position_look', { x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, pitch: pl.pitch, flags: { onGround: false, hasHorizontalCollision: false } })
         if (!this.loaded) {
@@ -447,7 +452,8 @@ export class Session {
   }
   private onMouseMove = (e: MouseEvent) => {
     if (document.pointerLockElement !== this.renderer.canvas) return
-    const s = this.opts.sensitivity * 0.15
+    const s = (Number(this.opts.sensitivity) || 1) * 0.15
+    if (!Number.isFinite(e.movementX) || !Number.isFinite(e.movementY)) return
     this.player.yaw += e.movementX * s
     this.player.pitch = Math.max(-90, Math.min(90, this.player.pitch + e.movementY * s))
   }
@@ -681,6 +687,14 @@ export class Session {
       this.conn.send('abilities', { flags: pl.flying ? 0x02 : 0 })
       this.lastFlying = pl.flying
     }
+
+    // Never send NaN/Infinity: the server kicks with "Invalid move packet received".
+    if (![pl.x, pl.y, pl.z, pl.yaw, pl.pitch, pl.vx, pl.vy, pl.vz].every(Number.isFinite)) {
+      console.warn('Beacon: invalid player state, restoring last good position', { x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, pitch: pl.pitch })
+      pl.x = this.good.x; pl.y = this.good.y; pl.z = this.good.z; pl.yaw = this.good.yaw; pl.pitch = this.good.pitch
+      pl.vx = pl.vy = pl.vz = 0
+    }
+    this.good = { x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, pitch: pl.pitch }
 
     const L = this.lastSent
     const moved = (pl.x - L.x) ** 2 + (pl.y - L.y) ** 2 + (pl.z - L.z) ** 2 > 4e-8 || L.ticks >= 20

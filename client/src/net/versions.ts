@@ -32,6 +32,16 @@ export async function latest(): Promise<VersionInfo> {
   return v[v.length - 1]
 }
 
+/**
+ * Version used for the first status ping. 26.2's packets are checked against Mojang's
+ * own packet report, so we offer that first; ViaVersion servers echo the client's
+ * protocol back, so they then let us in as 26.2 too.
+ */
+export async function pingVersion(): Promise<VersionInfo> {
+  const v = await versions()
+  return v.find(x => x.version === '26.2') ?? v[v.length - 1]
+}
+
 /** Picks the data for a server's protocol; unknown protocols use the newest 26.x. */
 export async function forProtocol(protocol: number): Promise<{ info: VersionInfo; exact: boolean }> {
   const v = await versions()

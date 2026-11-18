@@ -93,7 +93,7 @@ async function pingInto(s: store.ServerEntry, row: HTMLElement) {
   if (!settings.key && !settings.proxy) { motd.textContent = 'Set up your proxy first (Settings).'; return }
   try {
     const { host, port } = store.parseAddress(s.address)
-    const latest = await versions.latest()
+    const latest = await versions.pingVersion()
     const data = await versions.load(latest)
     const tr = await Transport.open({ proxy: proxyUrl(), key: settings.key, host, port })
     const { status, ms } = await pingServer(tr, data.codec, host, port ?? 25565, latest.protocol)
@@ -309,7 +309,7 @@ async function join(s: store.ServerEntry, override?: { host: string; port: numbe
   let tr: Transport | null = null
   try {
     // 1. ask the server which version it runs
-    const latest = await versions.latest()
+    const latest = await versions.pingVersion()
     const pingData = await versions.load(latest)
     const pt = await Transport.open({ proxy: proxyUrl(), key: settings.key, host, port: portGiven })
     const port = portGiven ?? pt.info?.port ?? 25565
