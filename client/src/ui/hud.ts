@@ -1,6 +1,7 @@
 // In-game overlay: hotbar, health, chat, titles, tab list, screens.
 import { toDom, toPlain, Component } from '../game/text'
 import type { BlockAssets } from '../render/assets'
+import { lock, unlock, isTouch } from './lock'
 
 export type Slot = { name: string; label: string; count: number; tex: string | null; color: number } | null
 
@@ -26,6 +27,9 @@ export class Hud {
   private chatHistory: string[] = []
   private histPos = -1
   private hotbar: HTMLElement
+  get hotbarEl() { return this.hotbar }
+  /** Called with true while any menu, chat or inventory covers the game. */
+  onScreensChanged: (open: boolean) => void = () => {}
   private hearts: HTMLElement
   private foodEl: HTMLElement
   private xpEl: HTMLElement
@@ -93,13 +97,15 @@ export class Hud {
     this.chatInput.style.display = 'block'
     setTimeout(() => this.chatInput.focus(), 0)
     this.histPos = -1
+    this.notify()
   }
   private closeChat() {
     this.typing = false
     this.root.classList.remove('typing')
     this.chatInput.style.display = 'none'
     this.chatInput.blur()
-    ;(document.querySelector('#game') as HTMLCanvasElement)?.requestPointerLock()
+    ;lock(document.querySelector('#game'))
+    this.notify()
   }
   private chatKey(e: KeyboardEvent) {
     e.stopPropagation()
@@ -212,24 +218,30 @@ export class Hud {
   }
 
   // ---------------- screens
+  private notify() {
+    const open = this.anyScreenOpen() || this.inventoryOpen
+    this.root.classList.toggle('screen-open', open)
+    this.onScreensChanged(open)
+  }
   anyScreenOpen() {
     return this.typing || !this.deathEl.classList.contains('hidden') || !this.pauseEl.classList.contains('hidden') || !this.containerEl.classList.contains('hidden')
   }
   death(msg: Component | null) {
-    if (msg === null) { this.deathEl.classList.add('hidden'); return }
-    document.exitPointerLock()
+    if (msg === null) { this.deathEl.classList.add('hidden'); this.notify(); return }
+    unlock()
     this.deathEl.innerHTML = ''
     el('h1', '', this.deathEl).textContent = 'You died!'
     const m = el('p', '', this.deathEl)
     if (typeof msg !== 'string' || msg !== 'You died!') m.appendChild(toDom(msg))
     const b = el('button', 'btn', this.deathEl)
     b.textContent = 'Respawn'
-    b.onclick = () => { this.onRespawn(); this.deathEl.classList.add('hidden'); (document.querySelector('#game') as HTMLCanvasElement).requestPointerLock() }
+    b.onclick = () => { this.onRespawn(); this.deathEl.classList.add('hidden'); lock(document.querySelector('#game')) }
     this.deathEl.classList.remove('hidden')
+    this.notify()
   }
   showPause(on: boolean) {
     this.pauseEl.innerHTML = ''
-    if (!on) { this.pauseEl.classList.add('hidden'); return }
+    if (!on) { this.pauseEl.classList.add('hidden'); this.notify(); return }
     el('h1', '', this.pauseEl).textContent = 'Game menu'
     const resume = el('button', 'btn', this.pauseEl)
     resume.textContent = 'Back to game'
@@ -237,11 +249,12 @@ export class Hud {
     const leave = el('button', 'btn', this.pauseEl)
     leave.textContent = 'Disconnect'
     leave.onclick = () => { this.showPause(false); this.onLeave() }
-    el('p', 'hint', this.pauseEl).textContent = 'WASD move · Space jump (double-tap to fly) · Shift sneak · Ctrl sprint · T chat · / command · E inventory · Tab players · F3 debug'
+    el('p', 'hint', this.pauseEl).textContent = isTouch ? 'Left stick: move (push to the edge to sprint) · drag: look · tap: place/use · hold: break/attack · ⇧ jump (double-tap to fly) · ⇩ sneak · tap the hotbar to switch items' : 'WASD move · Space jump (double-tap to fly) · Shift sneak · Ctrl sprint · T chat · / command · E inventory · Tab players · F3 debug'
     this.pauseEl.classList.remove('hidden')
+    this.notify()
   }
   showContainer(title: string | null, slots: Slot[]) {
-    if (title === null) { this.containerEl.classList.add('hidden'); return }
+    if (title === null) { this.containerEl.classList.add('hidden'); this.notify(); return }
     this.containerEl.innerHTML = ''
     el('h2', '', this.containerEl).textContent = title
     const grid = el('div', 'grid', this.containerEl)
@@ -251,10 +264,11 @@ export class Hud {
     b.textContent = 'Close (E)'
     b.onclick = () => this.onCloseContainer()
     this.containerEl.classList.remove('hidden')
+    this.notify()
   }
   showInventory(inv: Slot[] | null) {
     this.inventoryOpen = !!inv
-    if (!inv) { this.containerEl.classList.add('hidden'); return }
+    if (!inv) { this.containerEl.classList.add('hidden'); this.notify(); return }
     this.containerEl.innerHTML = ''
     el('h2', '', this.containerEl).textContent = 'Inventory'
     const armor = el('div', 'grid armor', this.containerEl)
@@ -265,10 +279,11 @@ export class Hud {
     for (let i = 36; i <= 44; i++) { const c = el('div', 'slot', hb); if (inv[i]) c.appendChild(this.icon(inv[i]!)) }
     el('p', 'hint', this.containerEl).textContent = 'Viewing only — use 1-9 or the scroll wheel to pick hotbar items.'
     this.containerEl.classList.remove('hidden')
+    this.notify()
   }
   confirm(title: string, text: string, yes: string, no: string): Promise<boolean> {
     return new Promise(resolve => {
-      document.exitPointerLock()
+      unlock()
       const d = el('div', 'screen confirm', this.root)
       el('h2', '', d).textContent = title
       el('pre', '', d).textContent = text

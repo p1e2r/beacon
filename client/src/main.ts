@@ -11,11 +11,13 @@ import { Session } from './game/session'
 import { Hud } from './ui/hud'
 import { setLanguage, toDom, toPlain } from './game/text'
 import * as store from './ui/store'
+import { lock, isTouch, goFullscreen } from './ui/lock'
 
 const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector(s) as T
 const canvas = $<HTMLCanvasElement>('#game')
 const hud = new Hud($('#hud'))
 let settings = store.loadSettings()
+if (isTouch) document.body.classList.add('is-touch')
 let servers = store.loadServers()
 let pack: Pack | null = null
 // texture layers, highest priority first; files are unzipped once and kept in memory
@@ -301,6 +303,7 @@ function showDisconnect(reason: any) {
 }
 
 async function join(s: store.ServerEntry, override?: { host: string; port: number }) {
+  goFullscreen()
   if (!settings.username) { toast('Pick a username in Settings first.', true); openSettings(); return }
   const parsed = store.parseAddress(s.address)
   const host = override?.host ?? parsed.host
@@ -339,7 +342,7 @@ async function join(s: store.ServerEntry, override?: { host: string; port: numbe
       host, port, username: settings.username, viewDistance: settings.viewDistance, fov: settings.fov, sensitivity: settings.sensitivity
     })
     hud.onLeave = () => session?.leave()
-    hud.onResume = () => canvas.requestPointerLock()
+    hud.onResume = () => lock(canvas)
     session.onEnd = (reason, transfer) => {
       session = null
       hud.showPause(false)
@@ -348,7 +351,7 @@ async function join(s: store.ServerEntry, override?: { host: string; port: numbe
       else if (reason === null) { show('main'); renderServers() }
       else showDisconnect(reason)
     }
-    canvas.requestPointerLock()
+    lock(canvas)
   } catch (e: any) {
     tr?.close()
     const msg = e instanceof ProxyError ? e.message : e?.message || String(e)

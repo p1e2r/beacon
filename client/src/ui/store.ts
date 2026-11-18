@@ -27,7 +27,9 @@ function read<T>(k: string, d: T): T {
 }
 
 export function loadSettings(): Settings {
-  return read<Settings>(S, { username: '', proxy: '', key: '', viewDistance: 8, fov: 70, sensitivity: 1 })
+  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+  // phones: shorter render distance by default
+  return read<Settings>(S, { username: '', proxy: '', key: '', viewDistance: touch ? 5 : 8, fov: 70, sensitivity: 1 })
 }
 export function saveSettings(s: Settings) {
   try { localStorage.setItem(S, JSON.stringify(s)) } catch {}

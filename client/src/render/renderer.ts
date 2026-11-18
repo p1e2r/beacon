@@ -67,7 +67,9 @@ export class Renderer {
 
   constructor(public canvas: HTMLCanvasElement, public world: World, public assets: BlockAssets) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    // phones have 3x screens; 1.5x keeps them fast and still sharp
+    const coarse = window.matchMedia?.('(pointer: coarse)').matches
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, coarse ? 1.5 : 2))
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.05, 1000)
     this.camera.rotation.order = 'YXZ'
     this.scene.add(this.entities)

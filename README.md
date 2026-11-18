@@ -106,6 +106,14 @@ resource pack at `web/pack.zip` inside the container; clients without their own 
 
 ## Controls
 
+**Phones and tablets (Android and iPhone/iPad):** left stick to move (push to the edge to
+sprint), drag anywhere to look, tap to place/use, hold to break/attack, ⇧ jump (double-tap
+to fly in creative), ⇩ sneak, tap the hotbar to switch items, and top buttons for chat,
+players, inventory and the menu. Play in landscape. Android goes full screen on join; on
+iPhone, use Share → Add to Home Screen for full screen.
+
+**Keyboard and mouse:**
+
 WASD move · mouse look · Space jump (double-tap to fly in creative) · Shift sneak · Ctrl sprint ·
 left click break/attack · right click place/use · middle click pick block · 1–9 / wheel hotbar ·
 Q drop · F swap hands · T or Enter chat · `/` command · E inventory · Tab players · F3 debug ·

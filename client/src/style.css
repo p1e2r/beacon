@@ -137,3 +137,56 @@ dialog h2 { margin-top: 0 }
 .btn.small { padding: 3px 8px; font-size: 12px }
 .btn:disabled { opacity: .35; cursor: default }
 .packwarn { color: var(--warn); font-size: 13px; margin: 6px 0 0 }
+
+/* ---------------- touch / mobile */
+body.is-touch, body.is-touch #game { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none }
+body:not(.is-touch) .touch-only { display: none }
+.touch { position: absolute; inset: 0; pointer-events: none; text-shadow: none; font-family: system-ui, sans-serif }
+.touch .t-look { position: absolute; inset: 0; pointer-events: auto }
+.touch .t-stick { position: absolute; left: calc(28px + env(safe-area-inset-left)); bottom: calc(28px + env(safe-area-inset-bottom)); width: 132px; height: 132px; border-radius: 50%; background: #ffffff14; border: 2px solid #ffffff30; pointer-events: auto; backdrop-filter: blur(2px) }
+.touch .t-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px; border-radius: 50%; background: #ffffff55; border: 2px solid #ffffffaa }
+.touch button { pointer-events: auto; border: 2px solid #ffffff40; background: #00000055; color: #fff; border-radius: 14px; font-size: 22px; line-height: 1; padding: 0; backdrop-filter: blur(2px); -webkit-tap-highlight-color: transparent }
+.touch button.down, .touch button.on { background: #ffffffaa; color: #000 }
+.touch .t-right { position: absolute; right: calc(24px + env(safe-area-inset-right)); bottom: calc(30px + env(safe-area-inset-bottom)); display: grid; gap: 14px; justify-items: end }
+.touch .t-jump { width: 76px; height: 76px; border-radius: 50%; font-size: 30px }
+.touch .t-sneak { width: 56px; height: 56px; border-radius: 50%; margin-right: 10px }
+.touch .t-top { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); display: flex; gap: 8px }
+.touch .t-top button { width: 44px; height: 44px; font-size: 20px }
+#hud.screen-open .touch, .spectator .touch .t-sneak { display: none }
+body.is-touch .crosshair { width: 14px; height: 14px }
+body.is-touch .crosshair::before { left: 6px; height: 14px } body.is-touch .crosshair::after { top: 6px; width: 14px }
+body.is-touch .hotbar { pointer-events: auto }
+body.is-touch .bottom { bottom: calc(4px + env(safe-area-inset-bottom)) }
+body.is-touch .chat { bottom: 150px; left: calc(6px + env(safe-area-inset-left)); width: min(460px, 55vw); font-size: 13px }
+body.is-touch .debug { font-size: 11px; top: 56px }
+body.is-touch .screen .btn { min-width: 220px; padding: 14px }
+body.is-touch .chatinput { top: calc(8px + env(safe-area-inset-top)); bottom: auto; font-size: 16px }
+.rotate { display: none }
+@media (orientation: portrait) {
+  body.is-touch.ingame .rotate { display: grid; position: fixed; inset: auto 0 0 0; z-index: 30; place-items: center; padding: 10px; background: #000c; color: #fff; font-size: 14px; pointer-events: none }
+}
+@media (max-width: 900px), (max-height: 500px) {
+  .hotbar .slot { width: 36px; height: 36px }
+  .icon { width: 26px; height: 26px }
+  .xp { width: 300px }
+  .hearts span, .food span { width: 13px; height: 13px }
+  .title { font-size: 36px } .subtitle { font-size: 18px; top: calc(28% + 50px) }
+}
+@media (max-width: 640px) {
+  .menu { padding: 10px; place-items: start center }
+  .panel { padding: 16px; border-radius: 12px }
+  .brand { flex-wrap: wrap; gap: 10px }
+  .brand h1 { font-size: 22px }
+  .server { grid-template-columns: 44px 1fr; gap: 10px }
+  .sicon { width: 44px; height: 44px }
+  .smeta { grid-column: 2; text-align: left }
+  .sactions { grid-column: 1 / -1 }
+  .sactions .join { flex: 1 }
+  .packrow { grid-template-columns: 1fr auto; }
+  .packrow .pk, .packrow .ps { display: none }
+  .servers { max-height: none }
+}
+input, select, button { font-size: 16px } /* stops iOS zooming into fields */
+body.is-touch .bottom { z-index: 3 }
+body.is-touch .touch { z-index: 2 }
+body.is-touch .screen, body.is-touch .chatinput, body.is-touch .tablist { z-index: 4 }

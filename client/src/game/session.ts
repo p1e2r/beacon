@@ -12,6 +12,8 @@ import { Player, Input } from './player'
 import { Hud, Slot } from '../ui/hud'
 import { toPlain, tr } from './text'
 import { Buffer } from 'buffer'
+import { lock, unlock, isLocked, isTouch, canLock } from '../ui/lock'
+import { TouchControls, TouchTarget } from '../ui/touch'
 
 export interface SessionOptions {
   host: string
@@ -26,7 +28,7 @@ interface RegistryEntry { key: string; value: any }
 
 const TOOL_TIER: Record<string, number> = { wooden: 2, stone: 4, copper: 5, iron: 6, diamond: 8, netherite: 9, golden: 12 }
 
-export class Session {
+export class Session implements TouchTarget {
   conn: Connection
   world: World
   player = new Player()
@@ -49,6 +51,8 @@ export class Session {
   tabFooter: any = ''
   private keys = new Set<string>()
   private mouse = { left: false, right: false }
+  private touch = { forward: 0, strafe: 0, sprint: false, jump: false, sneak: false }
+  private touchUi: TouchControls | null = null
   private lastSent = { x: NaN, y: NaN, z: NaN, yaw: NaN, pitch: NaN, ground: false, ticks: 0 }
   private good = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }
   private lastInputs = ''
@@ -353,7 +357,7 @@ export class Session {
       case 'open_window':
         this.container = { id: p.windowId, title: toPlain(simplifyNbt(p.windowTitle)), slots: [] }
         this.hud.showContainer(this.container.title, [])
-        document.exitPointerLock()
+        unlock()
         return
       case 'close_window':
         this.container = null
@@ -414,10 +418,10 @@ export class Session {
 
   private onKeyDown = (e: KeyboardEvent) => {
     if (this.hud.typing) return
-    const locked = document.pointerLockElement === this.renderer.canvas
+    const locked = isLocked(this.renderer.canvas) || isTouch
     if (e.code === 'KeyT' || e.code === 'Enter' || e.code === 'Slash') {
       e.preventDefault()
-      document.exitPointerLock()
+      unlock()
       this.hud.openChat(e.code === 'Slash' ? '/' : '')
       this.keys.clear()
       return
@@ -426,8 +430,8 @@ export class Session {
     if (e.code === 'F3') { e.preventDefault(); this.hud.toggleDebug(); return }
     if (e.code === 'KeyE') {
       if (this.container) { this.closeContainer(); return }
-      if (this.hud.inventoryOpen) { this.hud.showInventory(null); this.renderer.canvas.requestPointerLock(); return }
-      document.exitPointerLock()
+      if (this.hud.inventoryOpen) { this.hud.showInventory(null); lock(this.renderer.canvas); return }
+      unlock()
       this.hud.showInventory(this.inventory)
       return
     }
@@ -451,15 +455,16 @@ export class Session {
     this.keys.delete(e.code)
   }
   private onMouseMove = (e: MouseEvent) => {
-    if (document.pointerLockElement !== this.renderer.canvas) return
+    if (!isLocked(this.renderer.canvas)) return
     const s = (Number(this.opts.sensitivity) || 1) * 0.15
     if (!Number.isFinite(e.movementX) || !Number.isFinite(e.movementY)) return
     this.player.yaw += e.movementX * s
     this.player.pitch = Math.max(-90, Math.min(90, this.player.pitch + e.movementY * s))
   }
   private onMouseDown = (e: MouseEvent) => {
-    if (document.pointerLockElement !== this.renderer.canvas) {
-      if (e.target === this.renderer.canvas && !this.hud.anyScreenOpen()) this.renderer.canvas.requestPointerLock()
+    if (isTouch) return
+    if (!isLocked(this.renderer.canvas)) {
+      if (e.target === this.renderer.canvas && !this.hud.anyScreenOpen()) lock(this.renderer.canvas)
       return
     }
     if (e.button === 0) { this.mouse.left = true; this.attackOrDig(true) }
@@ -471,15 +476,24 @@ export class Session {
     if (e.button === 2) this.mouse.right = false
   }
   private onWheel = (e: WheelEvent) => {
-    if (document.pointerLockElement !== this.renderer.canvas) return
+    if (!isLocked(this.renderer.canvas)) return
     this.selectSlot((this.selected + (e.deltaY > 0 ? 1 : 8)) % 9)
   }
   private onBlur = () => { this.keys.clear(); this.mouse.left = this.mouse.right = false }
   private onLockChange = () => {
-    if (document.pointerLockElement !== this.renderer.canvas && !this.hud.anyScreenOpen() && !this.closed) this.hud.showPause(true)
+    if (!canLock) return
+    if (!isLocked(this.renderer.canvas) && !this.hud.anyScreenOpen() && !this.closed) this.hud.showPause(true)
   }
 
   private bindInput() {
+    if (isTouch) {
+      this.touchUi = new TouchControls(this.hud.root, this, () => Number(this.opts.sensitivity) || 1)
+      this.touchUi.onFlyToggle = () => {
+        if (this.player.canFly && !this.player.spectator) this.player.flying = !this.player.flying
+      }
+      this.touchUi.bindHotbar(this.hud.hotbarEl)
+      this.hud.onScreensChanged = open => this.touchUi?.show(!open)
+    }
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
     window.addEventListener('mousemove', this.onMouseMove)
@@ -492,6 +506,9 @@ export class Session {
   }
 
   private unbindInput() {
+    this.touchUi?.destroy()
+    this.touchUi = null
+    this.hud.onScreensChanged = () => {}
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
     window.removeEventListener('mousemove', this.onMouseMove)
@@ -502,7 +519,7 @@ export class Session {
     document.removeEventListener('pointerlockchange', this.onLockChange)
   }
 
-  private selectSlot(n: number) {
+  selectSlot(n: number) {
     if (n === this.selected) return
     this.selected = n
     this.conn.send('held_item_slot', { slotId: n })
@@ -513,18 +530,63 @@ export class Session {
     if (this.container) this.conn.send('close_window', { windowId: this.container.id })
     this.container = null
     this.hud.showContainer(null, [])
-    this.renderer.canvas.requestPointerLock()
+    lock(this.renderer.canvas)
   }
 
   private input(): Input {
     const k = this.keys
+    const t = this.touch
+    const kf = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0)
+    const ks = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0)
     return {
-      forward: (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0),
-      strafe: (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0),
-      jump: k.has('Space'),
-      sneak: k.has('ShiftLeft') || k.has('ShiftRight'),
-      sprint: k.has('ControlLeft') || k.has('ControlRight')
+      forward: kf || t.forward,
+      strafe: ks || t.strafe,
+      jump: k.has('Space') || t.jump,
+      sneak: k.has('ShiftLeft') || k.has('ShiftRight') || t.sneak,
+      sprint: k.has('ControlLeft') || k.has('ControlRight') || t.sprint
     }
+  }
+
+  // ------------------------------------------------------------------ touch (TouchTarget)
+
+  get sneaking() {
+    return this.touch.sneak
+  }
+  touchMove(forward: number, strafe: number, sprint: boolean) {
+    this.touch.forward = forward
+    this.touch.strafe = strafe
+    this.touch.sprint = sprint
+  }
+  touchLook(dx: number, dy: number) {
+    if (this.hud.anyScreenOpen() || !Number.isFinite(dx) || !Number.isFinite(dy)) return
+    this.player.yaw += dx
+    this.player.pitch = Math.max(-90, Math.min(90, this.player.pitch + dy))
+  }
+  touchKey(key: 'jump' | 'sneak', on: boolean) {
+    this.touch[key] = on
+  }
+  touchUse() {
+    if (this.hud.anyScreenOpen()) return
+    this.useOrPlace()
+  }
+  touchBreak(on: boolean) {
+    if (this.hud.anyScreenOpen()) on = false
+    this.mouse.left = on
+    if (on) this.attackOrDig(true)
+    else this.cancelDig()
+  }
+  openChat() {
+    this.hud.openChat('')
+  }
+  toggleInventory() {
+    if (this.container) return this.closeContainer()
+    this.hud.showInventory(this.hud.inventoryOpen ? null : this.inventory)
+  }
+  showPlayers(on: boolean) {
+    this.hud.showTab(on)
+  }
+  pause() {
+    this.hud.showPause(true)
   }
 
   // ------------------------------------------------------------------ interaction
@@ -787,7 +849,7 @@ export class Session {
     clearInterval(this.tickTimer)
     this.unbindInput()
     this.conn.close()
-    document.exitPointerLock()
+    unlock()
     this.entities.clear()
     this.onEnd(reason, transfer)
   }

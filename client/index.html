@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0e12" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Beacon" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icon-180.png" />
   <title>Beacon · Minecraft in your browser</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2312161c'/%3E%3Crect x='5' y='5' width='6' height='6' fill='%234fd1c5'/%3E%3Crect x='7' y='1' width='2' height='4' fill='%23a7f3eb'/%3E%3C/svg%3E" />
   <script type="module" src="/src/main.ts"></script>
@@ -51,6 +58,7 @@
         </fieldset>
         <fieldset>
           <legend>Textures</legend>
+          <p class="dim small touch-only">On iPhone/iPad: tap Share → <b>Add to Home Screen</b> to play full screen. Pick the .jar from the Files app.</p>
           <p class="dim small">Beacon can’t ship Minecraft’s textures. Load your own <b>26.x client .jar</b> (macOS: <code>~/Library/Application Support/minecraft/versions/26.2/26.2.jar</code>, Windows: <code>%appdata%\.minecraft\versions\26.2\26.2.jar</code>) then add any resource packs on top. Everything stays in this browser. You can also drop files onto the page.</p>
           <p class="dim small">Stack packs like in Minecraft: your <b>.jar</b> at the bottom, resource packs above it. Higher in the list wins.</p>
           <div id="packlist" class="packlist"></div>
@@ -94,5 +102,6 @@
   </dialog>
 
   <div id="toast"></div>
+  <div class="rotate">Turn your phone sideways for the best view</div>
 </body>
 </html>
