@@ -9,6 +9,7 @@
     "predev": "node scripts/build-data.mjs",
     "dev": "vite",
     "build": "node scripts/build-data.mjs && tsc --noEmit && vite build",
+    "pretest": "node scripts/build-data.mjs",
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
