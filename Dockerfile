@@ -13,15 +13,15 @@ COPY proxy/ ./
 RUN cargo build --release --locked
 
 FROM debian:stable-slim
-RUN useradd --system --uid 10001 --home /data beacon && mkdir -p /data && chown beacon /data
+RUN groupadd --system --gid 10001 beacon && useradd --system --uid 10001 --gid 10001 --home /data beacon && mkdir -p /data && chown beacon:beacon /data
 COPY --from=proxy /src/proxy/target/release/beacon-proxy /usr/local/bin/beacon-proxy
 COPY --from=web /src/client/dist /app/web
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 ENV BEACON_DATA=/data \
     BEACON_WEB=/app/web \
     BEACON_LISTEN=0.0.0.0:7320 \
     BEACON_ADMIN_LISTEN=0.0.0.0:9108
 VOLUME /data
 EXPOSE 7320 9108
-USER beacon
 HEALTHCHECK --interval=30s --timeout=3s CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/7320"]
-ENTRYPOINT ["beacon-proxy"]
+ENTRYPOINT ["docker-entrypoint.sh"]

@@ -61,9 +61,9 @@ everyone using it straight away. For an extra lock, set `admin_token` in `data/c
 Keys can also be managed from the command line, and a running proxy picks up the change:
 
 ```sh
-docker exec beacon beacon-proxy key create "Budi" --days 30 --max 1
-docker exec beacon beacon-proxy key list
-docker exec beacon beacon-proxy key disable <id>
+docker exec -u beacon beacon beacon-proxy key create "Budi" --days 30 --max 1
+docker exec -u beacon beacon beacon-proxy key list
+docker exec -u beacon beacon beacon-proxy key disable <id>
 ```
 
 ### Security notes
