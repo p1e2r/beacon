@@ -128,3 +128,12 @@ dialog h2 { margin-top: 0 }
 .container .grid.hb { margin-top: 4px }
 .container .slot { width: 40px; height: 40px; background: #8b8b8b; border: 2px solid; border-color: #373737 #fff #fff #373737; display: grid; place-items: center }
 .container h2 { margin: 0 }
+
+.packlist { display: grid; gap: 6px; margin: 8px 0 }
+.packrow { display: grid; grid-template-columns: 108px 1fr auto auto; gap: 10px; align-items: center; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: #ffffff06 }
+.packrow .pk { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--accent) }
+.packrow .pn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.packrow .pa { display: flex; gap: 4px }
+.btn.small { padding: 3px 8px; font-size: 12px }
+.btn:disabled { opacity: .35; cursor: default }
+.packwarn { color: var(--warn); font-size: 13px; margin: 6px 0 0 }

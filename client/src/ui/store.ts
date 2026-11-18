@@ -65,30 +65,43 @@ function db(): Promise<IDBDatabase> {
   })
 }
 
-export async function savePack(name: string, bytes: Uint8Array) {
-  const d = await db()
-  await new Promise<void>((res, rej) => {
-    const t = d.transaction('files', 'readwrite')
-    t.objectStore('files').put({ name, bytes }, 'pack')
-    t.oncomplete = () => res()
-    t.onerror = () => rej(t.error)
-  })
+export interface StoredPack {
+  id: string
+  name: string
+  bytes: Uint8Array
 }
 
-export async function loadPack(): Promise<{ name: string; bytes: Uint8Array } | null> {
+/** Texture packs, highest priority first (index 0 is the top of the list). */
+export async function loadPacks(): Promise<StoredPack[]> {
   try {
     const d = await db()
-    return await new Promise(res => {
-      const r = d.transaction('files').objectStore('files').get('pack')
+    const get = (k: string) => new Promise<any>(res => {
+      const r = d.transaction('files').objectStore('files').get(k)
       r.onsuccess = () => res(r.result ?? null)
       r.onerror = () => res(null)
     })
+    const list = await get('packs')
+    if (Array.isArray(list)) return list
+    // v1.0 kept a single pack
+    const old = await get('pack')
+    if (old?.bytes) {
+      const migrated = [{ id: Math.random().toString(36).slice(2), name: old.name, bytes: old.bytes }]
+      await savePacks(migrated)
+      return migrated
+    }
+    return []
   } catch {
-    return null
+    return []
   }
 }
 
-export async function clearPack() {
+export async function savePacks(list: StoredPack[]) {
   const d = await db()
-  d.transaction('files', 'readwrite').objectStore('files').delete('pack')
+  await new Promise<void>((res, rej) => {
+    const t = d.transaction('files', 'readwrite')
+    t.objectStore('files').put(list, 'packs')
+    t.objectStore('files').delete('pack')
+    t.oncomplete = () => res()
+    t.onerror = () => rej(t.error)
+  })
 }

@@ -51,8 +51,11 @@
         </fieldset>
         <fieldset>
           <legend>Textures</legend>
-          <p class="dim small">Beacon can’t ship Minecraft’s textures. Load your own <b>26.x client .jar</b> (macOS: <code>~/Library/Application Support/minecraft/versions/26.2/26.2.jar</code>, Windows: <code>%appdata%\.minecraft\versions\26.2\26.2.jar</code>) or any resource pack .zip. It stays in this browser. You can also drop the file onto the page.</p>
-          <div class="row"><label class="btn filebtn">Choose file…<input type="file" id="packfile" accept=".jar,.zip" hidden /></label><span id="packname" class="dim"></span><div class="grow"></div><button type="button" class="btn ghost" id="clearpack">Use plain colours</button></div>
+          <p class="dim small">Beacon can’t ship Minecraft’s textures. Load your own <b>26.x client .jar</b> (macOS: <code>~/Library/Application Support/minecraft/versions/26.2/26.2.jar</code>, Windows: <code>%appdata%\.minecraft\versions\26.2\26.2.jar</code>) then add any resource packs on top. Everything stays in this browser. You can also drop files onto the page.</p>
+          <p class="dim small">Stack packs like in Minecraft: your <b>.jar</b> at the bottom, resource packs above it. Higher in the list wins.</p>
+          <div id="packlist" class="packlist"></div>
+          <p id="packwarn" class="packwarn hidden"></p>
+          <div class="row"><label class="btn filebtn">Add .jar or pack…<input type="file" id="packfile" accept=".jar,.zip" multiple hidden /></label><div class="grow"></div><button type="button" class="btn ghost" id="clearpack">Remove all</button></div>
         </fieldset>
         <fieldset>
           <legend>Video &amp; controls</legend>

@@ -18,6 +18,11 @@ const hud = new Hud($('#hud'))
 let settings = store.loadSettings()
 let servers = store.loadServers()
 let pack: Pack | null = null
+// texture layers, highest priority first; files are unzipped once and kept in memory
+type Layer = store.StoredPack & { files?: Record<string, Uint8Array>; site?: boolean }
+let layers: Layer[] = []
+let sitePack: Layer | null = null
+let layerError = ''
 let renderer: Renderer | null = null
 let session: Session | null = null
 const assetCache = new Map<string, BlockAssets>()
@@ -138,7 +143,7 @@ function fillSettings() {
   ;(f.elements.namedItem('viewDistance') as HTMLInputElement).value = String(settings.viewDistance)
   ;(f.elements.namedItem('fov') as HTMLInputElement).value = String(settings.fov)
   ;(f.elements.namedItem('sensitivity') as HTMLInputElement).value = String(settings.sensitivity)
-  $('#packname').textContent = pack ? pack.name : 'none (plain colours)'
+  renderPacks()
   updateRangeLabels()
 }
 
@@ -185,19 +190,99 @@ async function testKey() {
   }
 }
 
-async function choosePack(file: File) {
-  try {
-    $('#packname').textContent = 'Reading…'
-    const bytes = new Uint8Array(await file.arrayBuffer())
-    pack = Pack.fromZip(bytes, file.name)
-    await store.savePack(file.name, bytes)
-    assetCache.clear()
-    $('#packname').textContent = file.name
-    toast('Textures loaded.')
-  } catch (e: any) {
-    $('#packname').textContent = pack ? pack.name : 'none (plain colours)'
-    toast(e.message, true)
+const isJar = (name: string) => /\.jar$/i.test(name)
+
+function filesOf(l: Layer) {
+  l.files ??= Pack.read(l.bytes)
+  return l.files
+}
+
+/** Rebuilds the combined pack from the layer list (bottom = last). */
+function rebuildPack() {
+  assetCache.clear()
+  layerError = ''
+  const all = [...layers]
+  if (sitePack) {
+    // the site's pack sits just above any game .jar, under the player's own packs
+    const firstJar = all.findIndex(l => isJar(l.name))
+    if (firstJar < 0) all.push(sitePack)
+    else all.splice(firstJar, 0, sitePack)
   }
+  if (!all.length) { pack = null; return }
+  try {
+    pack = Pack.stack(all.slice().reverse().map(l => ({ name: l.name, files: filesOf(l) })))
+    if (!pack.complete) layerError = 'These packs only change textures. Add your Minecraft .jar at the bottom so every block has a model.'
+  } catch (e: any) {
+    pack = null
+    layerError = e.message
+  }
+}
+
+function renderPacks() {
+  const list = $('#packlist')
+  list.innerHTML = ''
+  const rows: Layer[] = [...layers]
+  if (sitePack) rows.push(sitePack)
+  if (!rows.length) list.innerHTML = '<div class="empty small">No textures yet — blocks show as plain colours.</div>'
+  rows.forEach((l, i) => {
+    const row = document.createElement('div')
+    row.className = 'packrow'
+    const mb = (l.bytes.byteLength / 1048576).toFixed(1)
+    row.innerHTML = `<span class="pk"></span><span class="pn"></span><span class="ps dim">${mb} MB</span><span class="pa"></span>`
+    row.querySelector('.pk')!.textContent = l.site ? 'from this site' : isJar(l.name) ? 'game .jar' : 'resource pack'
+    row.querySelector('.pn')!.textContent = l.name
+    const acts = row.querySelector('.pa')!
+    if (!l.site) {
+      const mk = (label: string, title: string, fn: () => void, disabled = false) => {
+        const b = document.createElement('button')
+        b.type = 'button'; b.className = 'btn ghost small'; b.textContent = label; b.title = title; b.disabled = disabled
+        b.onclick = fn
+        acts.appendChild(b)
+      }
+      mk('▲', 'Higher priority', () => movePack(i, -1), i === 0)
+      mk('▼', 'Lower priority', () => movePack(i, 1), i === layers.length - 1)
+      mk('✕', 'Remove', () => removePack(i))
+    }
+    list.appendChild(row)
+  })
+  const warn = $('#packwarn')
+  warn.textContent = layerError
+  warn.classList.toggle('hidden', !layerError)
+}
+
+async function persistPacks() {
+  await store.savePacks(layers.map(({ id, name, bytes }) => ({ id, name, bytes })))
+}
+
+async function addPacks(files: File[]) {
+  for (const file of files) {
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const l: Layer = { id: Math.random().toString(36).slice(2), name: file.name, bytes }
+      filesOf(l) // validate now
+      // a game .jar goes to the bottom, resource packs on top
+      if (isJar(file.name)) layers.push(l)
+      else layers.unshift(l)
+    } catch (e: any) {
+      toast(`${file.name}: ${e.message}`, true)
+    }
+  }
+  rebuildPack()
+  renderPacks()
+  try { await persistPacks() } catch { toast('Could not save the packs in this browser (storage full?).', true) }
+  if (pack && !layerError) toast(`Textures: ${pack.name}`)
+}
+
+function movePack(i: number, d: number) {
+  const j = i + d
+  if (j < 0 || j >= layers.length) return
+  ;[layers[i], layers[j]] = [layers[j], layers[i]]
+  rebuildPack(); renderPacks(); persistPacks()
+}
+
+function removePack(i: number) {
+  layers.splice(i, 1)
+  rebuildPack(); renderPacks(); persistPacks()
 }
 
 // ----------------------------------------------------------------- joining
@@ -236,7 +321,7 @@ async function join(s: store.ServerEntry, override?: { host: string; port: numbe
     const [data, lang] = await Promise.all([versions.load(pick.info), versions.language()])
     setLanguage(lang)
     // 2. block models for this version + pack
-    const key = pick.info.version + '|' + (pack?.name ?? '')
+    const key = pick.info.version + '|' + [...layers.map(l => l.id), sitePack ? 'site' : ''].join(',')
     let assets = assetCache.get(key)
     if (!assets) {
       assets = new BlockAssets(data.blocks)
@@ -291,10 +376,15 @@ $('#testkey').onclick = testKey
 $('#settingsform').addEventListener('input', updateRangeLabels)
 $('#settingsform').addEventListener('submit', e => e.preventDefault())
 $<HTMLInputElement>('#packfile').onchange = e => {
-  const f = (e.target as HTMLInputElement).files?.[0]
-  if (f) choosePack(f)
+  const input = e.target as HTMLInputElement
+  const files = [...(input.files ?? [])]
+  input.value = ''
+  if (files.length) addPacks(files)
 }
-$('#clearpack').onclick = async () => { pack = null; assetCache.clear(); await store.clearPack(); fillSettings(); toast('Using plain colours.') }
+$('#clearpack').onclick = async () => {
+  if (layers.length && !confirm('Remove all texture packs from this browser?')) return
+  layers = []; rebuildPack(); renderPacks(); await persistPacks(); toast('Using plain colours.')
+}
 $('#discback').onclick = () => { show('main'); renderServers() }
 $<HTMLDialogElement>('#serverdlg').querySelector('.cancel')!.addEventListener('click', () => $<HTMLDialogElement>('#serverdlg').close())
 
@@ -304,21 +394,21 @@ window.addEventListener('keydown', e => {
 document.addEventListener('dragover', e => e.preventDefault())
 document.addEventListener('drop', e => {
   e.preventDefault()
-  const f = e.dataTransfer?.files?.[0]
-  if (f && /\.(jar|zip)$/i.test(f.name)) choosePack(f).then(fillSettings)
+  const files = [...(e.dataTransfer?.files ?? [])].filter(f => /\.(jar|zip)$/i.test(f.name))
+  if (files.length) addPacks(files)
 })
 
 ;(async () => {
-  const saved = await store.loadPack()
-  if (saved) {
-    try { pack = Pack.fromZip(saved.bytes, saved.name) } catch { pack = null }
-  } else {
-    // the proxy owner can drop a resource pack next to the client as pack.zip
-    try {
-      const r = await fetch('./pack.zip')
-      if (r.ok && (r.headers.get('content-type') ?? '').match(/zip|octet/)) pack = Pack.fromZip(new Uint8Array(await r.arrayBuffer()), 'pack.zip (from this site)')
-    } catch {}
-  }
+  layers = await store.loadPacks()
+  // the proxy owner can drop a resource pack next to the client as pack.zip
+  try {
+    const r = await fetch('./pack.zip')
+    if (r.ok && (r.headers.get('content-type') ?? '').match(/zip|octet/)) {
+      sitePack = { id: 'site', name: 'pack.zip', bytes: new Uint8Array(await r.arrayBuffer()), site: true }
+      filesOf(sitePack)
+    }
+  } catch { sitePack = null }
+  rebuildPack()
   show(settings.username && (settings.key || settings.proxy) ? 'main' : 'settings')
   if (!settings.username || (!settings.key && !settings.proxy)) fillSettings()
   renderServers()

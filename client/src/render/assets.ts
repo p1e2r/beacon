@@ -40,14 +40,33 @@ export class Pack {
     this.files = files
     this.name = name
   }
-  static fromZip(bytes: Uint8Array, name: string) {
+  /** Unzips only the files Beacon uses (assets/minecraft textures, models, blockstates). */
+  static read(bytes: Uint8Array): Record<string, Uint8Array> {
     const files = unzipSync(bytes, {
       filter: f => f.name.startsWith('assets/minecraft/') && (f.name.endsWith('.png') || f.name.endsWith('.json') || f.name.endsWith('.mcmeta'))
     })
-    const keys = Object.keys(files)
-    if (!keys.some(k => k.startsWith('assets/minecraft/textures/block/'))) throw new Error('No block textures found in that file. Pick a Minecraft .jar or a resource pack .zip.')
-    return new Pack(files, name)
+    if (!Object.keys(files).some(k => k.startsWith('assets/minecraft/textures/') || k.startsWith('assets/minecraft/models/') || k.startsWith('assets/minecraft/blockstates/')))
+      throw new Error('That file has no Minecraft textures or models. Pick a Minecraft .jar or a resource pack .zip.')
+    return files
   }
+  static fromZip(bytes: Uint8Array, name: string) {
+    return Pack.stack([{ name, files: Pack.read(bytes) }])
+  }
+  /**
+   * Layers packs like Minecraft does: later layers replace files from earlier ones.
+   * Pass them bottom first (usually the game .jar), top (highest priority) last.
+   */
+  static stack(layers: { name: string; files: Record<string, Uint8Array> }[]) {
+    const files: Record<string, Uint8Array> = {}
+    for (const l of layers) Object.assign(files, l.files)
+    if (!Object.keys(files).some(k => k.startsWith('assets/minecraft/textures/block/')))
+      throw new Error('No block textures found. Add your Minecraft .jar as the bottom layer.')
+    const pack = new Pack(files, layers.map(l => l.name).reverse().join(' + '))
+    pack.complete = Object.keys(files).some(k => k.startsWith('assets/minecraft/blockstates/'))
+    return pack
+  }
+  /** False when no layer has block models (a texture-only pack without the .jar under it). */
+  complete = true
   json(path: string): Json | null {
     const f = this.files[path]
     if (!f) return null
@@ -338,9 +357,15 @@ export class BlockAssets {
     onProgress('Building block models…')
     this.baked = new Array(this.reg.totalStates)
     const bakeCache = new Map<string, Baked>()
+    const fallbackCache = new Map<string, Baked>()
     for (const b of this.reg.blocks) {
       for (let s = b.min; s <= b.max; s++) {
         const ps = parts[s]
+        if (!ps.length && !INVISIBLE.has(b.name) && !this.fluidOf(s)) {
+          // no blockstate/model in any pack layer: plain shape instead of an invisible block
+          this.baked[s] = this.fallbackFor(s, fallbackCache)
+          continue
+        }
         const fluid = this.fluidOf(s)
         const cacheKey = ps.map(p => `${(p.model as any).__id ??= Math.random()}:${p.x}:${p.y}`).join('|') + ':' + b.name + ':' + fluid
         let baked = bakeCache.get(cacheKey)
@@ -402,40 +427,41 @@ export class BlockAssets {
     this.atlas = new Atlas(0, 16)
     this.baked = new Array(this.reg.totalStates)
     const cache = new Map<string, Baked>()
-    for (const b of this.reg.blocks) {
-      for (let s = b.min; s <= b.max; s++) {
-        const boxes = this.reg.collision(s)
-        const fluid = this.fluidOf(s)
-        const k = b.name + JSON.stringify(boxes) + fluid
-        let baked = cache.get(k)
-        if (!baked) {
-          const color = fallbackColor(b.name)
-          const quads: Quad[] = []
-          const r = this.atlas.rect('$white', 0, 0, 16, 16)
-          const uvc = [[r[0], r[1]], [r[0], r[3]], [r[2], r[3]], [r[2], r[1]]]
-          let full = false
-          const use = boxes.length ? boxes : PLANT.test(b.name) ? [[0.3, 0, 0.3, 0.7, 0.7, 0.7]] : []
-          for (const bx of use) {
-            const f = [bx[0] * 16, bx[1] * 16, bx[2] * 16], t = [bx[3] * 16, Math.min(16, bx[4] * 16), bx[5] * 16]
-            if (f[0] === 0 && f[1] === 0 && f[2] === 0 && t[0] === 16 && t[1] === 16 && t[2] === 16) full = true
-            for (let d = 0 as Dir; d < 6; d++) {
-              const corners = faceCorners(d, f, t)
-              const pos = new Float32Array(12), uvs = new Float32Array(8)
-              for (let i = 0; i < 4; i++) {
-                pos.set(corners[i].map(c => c / 16), i * 3)
-                uvs.set(uvc[i], i * 2)
-              }
-              const edge = isOnEdge(pos, d)
-              quads.push({ pos, uv: uvs, normal: d, cull: edge ? d : -1, tint: -2, shade: true, layer: Layer.Solid, edge })
-            }
-          }
-          const invisible = INVISIBLE.has(b.name) || (quads.length === 0 && !fluid)
-          baked = { quads, occludes: full && boxes.length === 1 && !b.transparent, fluid, invisible, color }
-          cache.set(k, baked)
+    for (const b of this.reg.blocks) for (let s = b.min; s <= b.max; s++) this.baked[s] = this.fallbackFor(s, cache)
+  }
+
+  /** Flat-coloured geometry from the collision shape (used when no model is available). */
+  private fallbackFor(s: number, cache: Map<string, Baked>): Baked {
+    const b = this.reg.block(s)
+    const boxes = this.reg.collision(s)
+    const fluid = this.fluidOf(s)
+    const k = b.name + JSON.stringify(boxes) + fluid
+    let baked = cache.get(k)
+    if (baked) return baked
+    const color = fallbackColor(b.name)
+    const quads: Quad[] = []
+    const r = this.atlas.rect('$white', 0, 0, 16, 16)
+    const uvc = [[r[0], r[1]], [r[0], r[3]], [r[2], r[3]], [r[2], r[1]]]
+    let full = false
+    const use = boxes.length ? boxes : PLANT.test(b.name) ? [[0.3, 0, 0.3, 0.7, 0.7, 0.7]] : []
+    for (const bx of use) {
+      const f = [bx[0] * 16, bx[1] * 16, bx[2] * 16], t = [bx[3] * 16, Math.min(16, bx[4] * 16), bx[5] * 16]
+      if (f[0] === 0 && f[1] === 0 && f[2] === 0 && t[0] === 16 && t[1] === 16 && t[2] === 16) full = true
+      for (let d = 0 as Dir; d < 6; d++) {
+        const corners = faceCorners(d, f, t)
+        const pos = new Float32Array(12), uvs = new Float32Array(8)
+        for (let i = 0; i < 4; i++) {
+          pos.set(corners[i].map(c => c / 16), i * 3)
+          uvs.set(uvc[i], i * 2)
         }
-        this.baked[s] = baked
+        const edge = isOnEdge(pos, d)
+        quads.push({ pos, uv: uvs, normal: d, cull: edge ? d : -1, tint: -2, shade: true, layer: Layer.Solid, edge })
       }
     }
+    const invisible = INVISIBLE.has(b.name) || (quads.length === 0 && !fluid)
+    baked = { quads, occludes: full && boxes.length === 1 && !b.transparent, fluid, invisible, color }
+    cache.set(k, baked)
+    return baked
   }
 
   fluidOf(s: number): 0 | 1 | 2 {
